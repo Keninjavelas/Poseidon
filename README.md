@@ -7,7 +7,7 @@ Poseidon is a production-oriented smart water operations platform for campuses, 
 ```mermaid
 graph TD
   Edge[Edge AI / YOLOv8 Node] -->|poseidon/alerts/*| MQTT[Mosquitto Broker]
-  Sim[Telemetry Simulator] -->|poseidon/{module}/{sensor_id}| MQTT
+  Sim[Telemetry Simulator] -->|poseidon/module/sensor_id| MQTT
   MQTT --> Ingest[Ingestion Service]
   Ingest -->|raw events| Redis[(Redis Pub/Sub)]
   Redis --> Process[Processing Service]
