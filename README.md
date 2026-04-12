@@ -164,6 +164,8 @@ npm run install:all
 npm run dev:stack
 ```
 
+Note: `dev:stack` now runs `docker compose up -d timescaledb redis mosquitto` first. Ensure Docker Desktop (engine) is running before starting.
+
 This starts:
 - telemetry simulator
 - MQTT ingestion service

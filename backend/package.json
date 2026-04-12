@@ -1,0 +1,36 @@
+{
+  "name": "poseidon-backend",
+  "version": "1.0.0",
+  "description": "Poseidon Smart Water Hub — Node.js/Express backend",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node src/bin/api.js",
+    "dev:api": "node src/bin/api.js",
+    "dev:ingest": "node src/bin/ingestion.js",
+    "dev:process": "node src/bin/processing.js",
+    "dev:simulate": "node src/bin/simulator.js",
+    "start": "node src/bin/api.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mqtt": "^5.7.3",
+    "pg": "^8.12.0",
+    "pino": "^9.3.2",
+    "pino-http": "^10.3.0",
+    "poseidon": "file:..",
+    "redis": "^4.7.0",
+    "ws": "^8.18.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "fast-check": "^3.20.0",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  }
+}

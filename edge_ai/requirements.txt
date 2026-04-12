@@ -1,0 +1,4 @@
+paho-mqtt>=1.6.1
+hypothesis>=6.0.0
+pytest>=7.0.0
+pytest-asyncio>=0.24.0

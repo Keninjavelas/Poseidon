@@ -1,0 +1,278 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: poseidon
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: timescaledb
+  namespace: poseidon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: timescaledb
+  template:
+    metadata:
+      labels:
+        app: timescaledb
+    spec:
+      containers:
+        - name: timescaledb
+          image: timescale/timescaledb:latest-pg16
+          env:
+            - name: POSTGRES_USER
+              value: poseidon
+            - name: POSTGRES_PASSWORD
+              value: poseidon
+            - name: POSTGRES_DB
+              value: poseidon
+          ports:
+            - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: timescaledb
+  namespace: poseidon
+spec:
+  selector:
+    app: timescaledb
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: poseidon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: poseidon
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+  namespace: poseidon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mosquitto
+  template:
+    metadata:
+      labels:
+        app: mosquitto
+    spec:
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:2
+          ports:
+            - containerPort: 1883
+            - containerPort: 9001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mosquitto
+  namespace: poseidon
+spec:
+  selector:
+    app: mosquitto
+  ports:
+    - name: mqtt
+      port: 1883
+      targetPort: 1883
+    - name: ws
+      port: 9001
+      targetPort: 9001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: poseidon-simulator
+  namespace: poseidon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: poseidon-simulator
+  template:
+    metadata:
+      labels:
+        app: poseidon-simulator
+    spec:
+      containers:
+        - name: simulator
+          image: ghcr.io/poseidon/backend-simulator:latest
+          env:
+            - name: MQTT_BROKER_URL
+              value: mqtt://mosquitto:1883
+            - name: SIM_INTERVAL_MS
+              value: "5000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: poseidon-ingestion
+  namespace: poseidon
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: poseidon-ingestion
+  template:
+    metadata:
+      labels:
+        app: poseidon-ingestion
+    spec:
+      containers:
+        - name: ingestion
+          image: ghcr.io/poseidon/backend-ingestion:latest
+          env:
+            - name: DATABASE_URL
+              value: postgresql://poseidon:poseidon@timescaledb:5432/poseidon
+            - name: REDIS_URL
+              value: redis://redis:6379
+            - name: MQTT_BROKER_URL
+              value: mqtt://mosquitto:1883
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: poseidon-processing
+  namespace: poseidon
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: poseidon-processing
+  template:
+    metadata:
+      labels:
+        app: poseidon-processing
+    spec:
+      containers:
+        - name: processing
+          image: ghcr.io/poseidon/backend-processing:latest
+          env:
+            - name: DATABASE_URL
+              value: postgresql://poseidon:poseidon@timescaledb:5432/poseidon
+            - name: REDIS_URL
+              value: redis://redis:6379
+            - name: MQTT_BROKER_URL
+              value: mqtt://mosquitto:1883
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: poseidon-api
+  namespace: poseidon
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: poseidon-api
+  template:
+    metadata:
+      labels:
+        app: poseidon-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/poseidon/backend-api:latest
+          ports:
+            - containerPort: 3001
+          env:
+            - name: PORT
+              value: "3001"
+            - name: REDIS_URL
+              value: redis://redis:6379
+            - name: DATABASE_URL
+              value: postgresql://poseidon:poseidon@timescaledb:5432/poseidon
+            - name: MQTT_BROKER_URL
+              value: mqtt://mosquitto:1883
+            - name: CORS_ORIGIN
+              value: http://localhost:3000
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: poseidon-secrets
+                  key: jwt-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: poseidon-api
+  namespace: poseidon
+spec:
+  selector:
+    app: poseidon-api
+  ports:
+    - port: 3001
+      targetPort: 3001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: poseidon-frontend
+  namespace: poseidon
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: poseidon-frontend
+  template:
+    metadata:
+      labels:
+        app: poseidon-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/poseidon/frontend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: http://poseidon-api.poseidon.svc.cluster.local:3001
+            - name: NEXT_PUBLIC_WS_URL
+              value: ws://poseidon-api.poseidon.svc.cluster.local:3001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: poseidon-frontend
+  namespace: poseidon
+spec:
+  selector:
+    app: poseidon-frontend
+  ports:
+    - port: 3000
+      targetPort: 3000

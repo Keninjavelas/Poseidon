@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Poseidon trident icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bg)"/>
+
+  <path fill="url(#metal)" d="M31 13h2v30h-2z"/>
+  <path fill="url(#metal)" d="M31 43h2v8h-2z"/>
+
+  <path fill="url(#metal)" d="M31 13h8l-6 11h-2z"/>
+  <path fill="url(#metal)" d="M33 13h8l-8 14z"/>
+
+  <path fill="url(#metal)" d="M23 13h8v11h-2z"/>
+  <path fill="url(#metal)" d="M23 13h8l-6 14h-2z"/>
+
+  <path fill="url(#metal)" d="M27 12a1 1 0 0 1 1 1v12h-2V13a1 1 0 0 1 1-1z"/>
+  <path fill="url(#metal)" d="M37 12a1 1 0 0 1 1 1v12h-2V13a1 1 0 0 1 1-1z"/>
+
+  <path fill="url(#metal)" d="M24 45h16l-1.5 6h-13z"/>
+</svg>

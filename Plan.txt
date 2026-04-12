@@ -1,0 +1,113 @@
+System Role: You are an Expert Full-Stack IoT Developer and Systems Architect. Your objective is to build a complete, functional proof-of-concept for a project named Poseidon, an Edge-Integrated Smart Water Management Hub.
+
+Project Context: > Poseidon is not just a static dashboard; it is a unified, real-time situational awareness platform for water infrastructure (e.g., smart campuses, eco-farms). It ingests simulated IoT sensor telemetry and edge-processed optical data to visualize and manage a closed-loop water ecosystem.
+
+The system consists of five interconnected modules:
+
+Rainfall Tracker: Monitors real-time precipitation (mm/hr) and forecasts to predict inflows.
+
+Harvesting Tracker: Calculates rainwater captured into storage tanks based on rainfall data.
+
+Water Quality Tracker: Monitors pH, TDS, and turbidity. It also receives alerts from optical edge-computing nodes.
+
+Agricultural Tracker: Tracks soil moisture and calculates irrigation needs, prioritizing harvested water over municipal water.
+
+Water Usage Tracker: The master view showing total consumption, comparing municipal vs. harvested water usage.
+
+Tech Stack Requirements:
+
+Frontend: Next.js (React), Tailwind CSS, shadcn/ui (for rapid component layout), Recharts (for dynamic data visualization).
+
+Backend/API: Node.js with Express.
+
+Database: PostgreSQL (optimized for time-series data) or Supabase.
+
+IoT Ingestion: MQTT protocol (use a broker like Eclipse Mosquitto or a Node.js MQTT library) to handle incoming sensor streams.
+
+Edge AI Integration: The system must include a simulated Python edge script representing camera nodes running a YOLOv8s model. This script should simulate real-time optical threat detection (e.g., severe discoloration, physical pipe blockages) and publish zero-latency alert payloads to the MQTT broker.
+
+Execution Steps:
+Please execute the build in the following order, providing the complete code for each phase:
+
+Phase 1: Database & Schema Setup
+
+Design the relational/time-series database schema for the five trackers (Rainfall_Log, Storage_Tanks, Quality_Sensors, Irrigation_Zones, Overall_Usage).
+
+Provide the SQL initialization scripts.
+
+Phase 2: Backend & Telemetry Simulation
+
+Initialize the Node.js backend.
+
+Create a data simulation script that generates realistic, interconnected data (e.g., rain increases harvesting storage, which is then depleted by agricultural irrigation).
+
+Create the Python edge-node script simulating the YOLOv8s optical detection, pushing random anomaly alerts (like "Contaminant Detected" or "Blockage") via MQTT to the backend.
+
+Phase 3: API & WebSockets
+
+Build the REST API routes to fetch historical data.
+
+Setup WebSockets (or utilize Supabase real-time subscriptions) to push live sensor updates to the frontend.
+
+Phase 4: Frontend Dashboard Implementation
+
+Initialize the Next.js application.
+
+Create a unified sidebar navigation layout.
+
+Build the individual React components for each of the 5 trackers, utilizing Recharts to map the live WebSocket data to line graphs, bar charts, and KPI cards.
+
+Ensure the UI clearly displays the real-time situational awareness alerts triggered by the edge-AI nodes.
+
+Gemini said
+Here is a clean, modular mono-folder (monorepo) structure for Poseidon. This keeps your frontend, backend, edge-AI simulation, and database schemas all in one place, which is perfect for feeding into an AI coding assistant or managing as a tight-knit project.
+
+Plaintext
+poseidon/
+├── frontend/                     # Next.js & React Dashboard
+│   ├── public/                   # Static assets (logos, icons)
+│   ├── src/
+│   │   ├── app/                  # Next.js App Router (pages)
+│   │   │   ├── page.tsx          # Main dashboard view (The Master View)
+│   │   │   ├── layout.tsx        # Global layout (Sidebar, Navbar)
+│   │   │   └── globals.css       # Tailwind CSS styles
+│   │   ├── components/           # Reusable UI components
+│   │   │   ├── layout/           # Sidebar, Header, KPI Cards
+│   │   │   ├── charts/           # Recharts wrapper components
+│   │   │   └── trackers/         # The 5 core modules
+│   │   │       ├── UsageTracker.tsx
+│   │   │       ├── RainfallTracker.tsx
+│   │   │       ├── QualityTracker.tsx
+│   │   │       ├── HarvestingTracker.tsx
+│   │   │       └── AgriculturalTracker.tsx
+│   │   ├── lib/                  # Utilities (WebSocket client, API fetchers)
+│   │   └── types/                # TypeScript interfaces for sensor data
+│   ├── package.json
+│   └── tailwind.config.js
+│
+├── backend/                      # Node.js & Express API
+│   ├── src/
+│   │   ├── controllers/          # API endpoint logic
+│   │   ├── routes/               # Express route definitions
+│   │   ├── services/
+│   │   │   ├── db.js             # Database connection pool
+│   │   │   ├── mqttClient.js     # MQTT listener for edge/sensor data
+│   │   │   └── simulation.js     # Script to generate dummy telemetry data
+│   │   ├── app.js                # Express app setup
+│   │   └── server.js             # Server & WebSocket initialization
+│   ├── .env                      # DB credentials, MQTT broker URL
+│   └── package.json
+│
+├── edge_ai/                      # Python Edge Computing Simulation
+│   ├── models/                   # Folder for YOLOv8 weights (e.g., yolov8s.pt)
+│   ├── optical_sentry.py         # Simulates YOLOv8 optical detection
+│   ├── mqtt_publisher.py         # Pushes anomaly payloads to backend
+│   └── requirements.txt          # Python dependencies (ultralytics, paho-mqtt)
+│
+├── database/                     # Postgres/Supabase Setup
+│   ├── 01_schema.sql             # Table creation (Rainfall, Tanks, etc.)
+│   └── 02_seed_data.sql          # Initial dummy data for testing
+│
+├── docker-compose.yml            # (Optional) Spin up Postgres & MQTT Broker locally
+├── README.md                     # Project overview and run instructions
+└── .gitignore                    # Ignore node_modules, .env, __pycache__

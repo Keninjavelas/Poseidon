@@ -1,0 +1,150 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: poseidon_timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: poseidon
+      POSTGRES_PASSWORD: poseidon
+      POSTGRES_DB: poseidon
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poseidon -d poseidon -h localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: poseidon_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: poseidon_mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+  db-migrate:
+    image: timescale/timescaledb:latest-pg16
+    container_name: poseidon_db_migrate
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: poseidon
+    command: ["psql", "-h", "timescaledb", "-U", "poseidon", "-d", "poseidon", "-f", "/migrations/03_migrate_existing.sql"]
+    volumes:
+      - ./database:/migrations
+    restart: "no"
+
+  simulator:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.simulator
+    container_name: poseidon_simulator
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    env_file:
+      - ./backend/.env
+    environment:
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+
+  ingestion:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ingestion
+    container_name: poseidon_ingestion
+    restart: unless-stopped
+    depends_on:
+      - timescaledb
+      - redis
+      - mosquitto
+    env_file:
+      - ./backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://poseidon:poseidon@timescaledb:5432/poseidon
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+
+  processing:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.processing
+    container_name: poseidon_processing
+    restart: unless-stopped
+    depends_on:
+      - timescaledb
+      - redis
+      - mosquitto
+    env_file:
+      - ./backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://poseidon:poseidon@timescaledb:5432/poseidon
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.api
+    container_name: poseidon_backend
+    restart: unless-stopped
+    depends_on:
+      - timescaledb
+      - redis
+      - mosquitto
+    env_file:
+      - ./backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://poseidon:poseidon@timescaledb:5432/poseidon
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    ports:
+      - "3001:3001"
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: poseidon_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file:
+      - ./frontend/.env.local
+    ports:
+      - "3000:3000"
+
+  edge_ai:
+    build:
+      context: ./edge_ai
+      dockerfile: Dockerfile
+    container_name: poseidon_edge_ai
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    env_file:
+      - ./edge_ai/.env
+    environment:
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+
+volumes:
+  postgres_data:
+  mosquitto_data:
+  mosquitto_log:
