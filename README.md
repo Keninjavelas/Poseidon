@@ -226,7 +226,7 @@ cd edge_ai && pytest -q
 - CI/CD workflow: `.github/workflows/ci-cd.yml`
 - Container images are split per service so ingestion, processing, API, frontend, and edge AI can scale independently.
 - GitHub Actions deploy requires a repository secret named `KUBE_CONFIG_DATA` containing a base64-encoded kubeconfig.
-- On `main`, CI automatically builds and pushes required GHCR images (`backend-simulator`, `backend-ingestion`, `backend-processing`, `backend-api`, `frontend`) before deployment.
+- On `main`, CI automatically builds and pushes required GHCR images (`backend-simulator`, `backend-ingestion`, `backend-processing`, `backend-api`, `frontend`) under `ghcr.io/<repo-owner>/...` before deployment.
 - Image tags are hardened with branch/tag-aware labels plus immutable SHA tags.
 - Deploy verifies required SHA-tagged GHCR images exist before `kubectl apply` so missing tags fail fast.
 - Deploy runs in the GitHub `production` environment and pins workloads to immutable SHA images before rollout checks.
