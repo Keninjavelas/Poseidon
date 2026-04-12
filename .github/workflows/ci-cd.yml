@@ -108,13 +108,31 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
+  deploy-check:
     needs: publish-images
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+    steps:
+      - id: check
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+        run: |
+          if [ -z "$KUBE_CONFIG_DATA" ]; then
+            echo "::notice::KUBE_CONFIG_DATA is not configured; skipping deploy job."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: deploy-check
+    if: github.ref == 'refs/heads/main' && needs.deploy-check.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
     environment: production
     env:
-      KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
       IMAGE_TAG: sha-${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -123,14 +141,9 @@ jobs:
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
 
-      - name: Validate deployment secret
-        run: |
-          if [ -z "${KUBE_CONFIG_DATA}" ]; then
-            echo "::error::Missing KUBE_CONFIG_DATA secret (base64 kubeconfig)."
-            exit 1
-          fi
-
       - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
         run: |
           mkdir -p "$HOME/.kube"
           echo "${KUBE_CONFIG_DATA}" | base64 -d > "$HOME/.kube/config"
