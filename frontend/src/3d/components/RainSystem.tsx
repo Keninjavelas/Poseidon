@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Matrix4, Vector3 } from 'three';
+import { InstancedMesh, Matrix4, Vector3 } from 'three';
 
 type RainSystemProps = {
   intensity: number;
@@ -10,7 +10,7 @@ const PARTICLE_COUNT = 550;
 const bounds = 22;
 
 export function RainSystem({ intensity }: RainSystemProps) {
-  const instancedRef = useRef<THREE.InstancedMesh>(null);
+  const instancedRef = useRef<InstancedMesh>(null);
   const positions = useMemo(
     () =>
       new Array(PARTICLE_COUNT).fill(0).map(() => ({

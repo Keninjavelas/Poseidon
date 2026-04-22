@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.leaflet-container {
+	height: 100%;
+	width: 100%;
+}
+
+.leaflet-popup-content {
+	margin: 10px 12px;
+	font-size: 0.875rem;
+}

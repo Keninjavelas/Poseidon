@@ -6,6 +6,7 @@ import type { WsStatus } from '@/lib/useWebSocket';
 
 const NAV_LINKS = [
   { href: '/digital-twin', label: 'Digital Twin' },
+  { href: '/map', label: 'Map' },
   { href: '/usage', label: 'Water Usage' },
   { href: '/rainfall', label: 'Rainfall' },
   { href: '/harvesting', label: 'Harvesting' },
