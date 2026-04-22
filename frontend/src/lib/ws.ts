@@ -111,7 +111,7 @@ function connect(): void {
         ? Math.floor(Math.random() * 250 * useStore.getState().chaos.intensity)
         : 0;
 
-      const candidates = applyChaos(parsed.data);
+      const candidates = applyChaos(parsed.data as WsMessage<unknown>);
       if (jitterDelayMs > 0) {
         setTimeout(() => {
           queue.push(...candidates);

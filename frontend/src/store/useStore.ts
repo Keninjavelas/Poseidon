@@ -13,6 +13,7 @@ import type {
 } from '@/types';
 import {
   INITIAL_SYSTEM_STATE,
+  type Alert,
   type GeoEntity,
   type SystemState,
 } from '@/simulation/models';
@@ -126,7 +127,7 @@ export const useStore = create<DigitalTwinState>((set) => ({
                 severity: alert.confidence_score > 0.8 ? 'critical' : 'warning',
                 sourceId: alert.node_id,
                 message: alert.alert_type,
-              },
+              } as Alert,
               ...state.systemState.alerts,
             ].slice(0, MAX_ALERTS),
           };

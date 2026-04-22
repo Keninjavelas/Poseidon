@@ -1,3 +1,5 @@
+'use client';
+
 import dynamic from 'next/dynamic';
 
 const LeafletMap = dynamic(() => import('@/map/LeafletMap').then((mod) => mod.LeafletMap), { ssr: false });

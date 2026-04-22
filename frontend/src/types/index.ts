@@ -53,6 +53,6 @@ export type AlertPayload = Pick<AnomalyAlert, 'node_id' | 'timestamp' | 'alert_t
 };
 
 export interface WsMessage<T> {
-  channel: 'rainfall' | 'tanks' | 'quality' | 'irrigation' | 'usage' | 'alerts' | 'system_state';
+  channel: 'rainfall' | 'tanks' | 'quality' | 'irrigation' | 'usage' | 'alerts' | 'system_state' | 'system_control';
   data: T;
 }

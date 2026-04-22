@@ -1,7 +1,5 @@
 'use client';
 
-import L from 'leaflet';
-
 const ICON_SVG = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">
     <path fill="#2563eb" stroke="#ffffff" stroke-width="1.5" d="M12.5 0C7.25 0 3 4.25 3 9.5 3 16.25 12.5 41 12.5 41S22 16.25 22 9.5C22 4.25 17.75 0 12.5 0z"/>
@@ -15,14 +13,17 @@ const SHADOW_SVG = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
   </svg>
 `)}`;
 
-delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: ICON_SVG,
-  iconUrl: ICON_SVG,
-  shadowUrl: SHADOW_SVG,
-});
-
 export function ensureLeafletSetup() {
-  return L;
+  if (typeof window !== 'undefined') {
+    const L = require('leaflet');
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: ICON_SVG,
+      iconUrl: ICON_SVG,
+      shadowUrl: SHADOW_SVG,
+    });
+    return L;
+  }
+  return null;
 }

@@ -7,8 +7,6 @@ import { useStore } from '@/store/useStore';
 import { GEO_ENTITIES } from '@/simulation/models';
 import { CircleMarker, MapContainer, Popup, TileLayer, Tooltip } from 'react-leaflet';
 
-ensureLeafletSetup();
-
 type Status = 'normal' | 'warning' | 'critical';
 type LatLng = [number, number];
 
@@ -150,6 +148,7 @@ const SensorMarker = memo(function SensorMarker({
 });
 
 export function LeafletMap() {
+  ensureLeafletSetup();
   useWebSocket();
 
   const systemState = useStore((state) => state.systemState);
