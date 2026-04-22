@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { WsStatus } from '@/lib/useWebSocket';
+import type { WsStatus } from '@/store/useStore';
 
 const NAV_LINKS = [
   { href: '/digital-twin', label: 'Digital Twin' },
