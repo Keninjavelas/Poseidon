@@ -13,7 +13,7 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().min(1),
   JWT_SECRET: z.string().min(16).default('poseidon-dev-secret-change-me'),
   AUTH_MODE: z.enum(['required', 'optional', 'disabled']).default('optional'),
-  SIM_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
+  SIM_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
 });
 
 function getEnv(runtimeEnv = process.env) {

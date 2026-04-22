@@ -15,7 +15,7 @@ const { logger } = require('./lib/logger');
  *
  * @returns {import('express').Application}
  */
-function createApp() {
+function createApp(options = {}) {
   const app = express();
   const corsOrigin = process.env.CORS_ORIGIN || '*';
   const authConfig = {
@@ -37,12 +37,15 @@ function createApp() {
   app.use(createApiRateLimit());
   app.use(createAuthMiddleware(authConfig, logger));
 
+  app.locals.digitalTwinService = options.digitalTwinService || null;
+
   app.use('/api/rainfall', require('./routes/rainfall'));
   app.use('/api/harvesting', require('./routes/harvesting'));
   app.use('/api/quality', require('./routes/quality'));
   app.use('/api/agriculture', require('./routes/agriculture'));
   app.use('/api/usage', require('./routes/usage'));
   app.use('/api/alerts', require('./routes/alerts'));
+  app.use('/api/twin', require('./routes/digitalTwin'));
   app.use('/api/auth', require('./routes/auth'));
 
   // Health check

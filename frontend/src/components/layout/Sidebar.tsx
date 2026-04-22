@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import type { WsStatus } from '@/lib/useWebSocket';
 
 const NAV_LINKS = [
+  { href: '/digital-twin', label: 'Digital Twin' },
   { href: '/usage', label: 'Water Usage' },
   { href: '/rainfall', label: 'Rainfall' },
   { href: '/harvesting', label: 'Harvesting' },
