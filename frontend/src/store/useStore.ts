@@ -215,8 +215,8 @@ export const useStore = create<DigitalTwinState>((set) => ({
             id: Math.random(),
             timestamp: isoTimestamp,
             tank_id: t.id,
-            volume_liters: t.volume_liters || t.volumeLiters || 0,
-            capacity_liters: t.capacity_liters || t.capacityLiters || 1,
+            volume_liters: t.volumeLiters || 0,
+            capacity_liters: t.capacityLiters || 1,
           } as TankReading));
 
           const newAgriculture = Object.values(nextState.soil || {}).map(s => ({
