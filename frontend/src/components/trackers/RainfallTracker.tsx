@@ -90,7 +90,7 @@ export function RainfallTracker() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <KPICard label="Avg Precipitation Rate" value={currentRate.toFixed(2)} unit="mm/hr" warning={isHeavy} />
+        <KPICard label="Avg Precipitation Rate" value={currentRate.toFixed(2)} unit="mm/hr" status={isHeavy ? 'critical' : 'normal'} />
         <KPICard label="Forecast" value={FORECAST_LABELS[forecast]} />
       </div>
 

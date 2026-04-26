@@ -56,9 +56,9 @@ export function AgriculturalTracker() {
         {latestPerZone.map((r) => {
           const status = getMoistureStatus(r.moisture);
           const statusColor =
-            status === 'critical' ? 'red' :
-            status === 'warning' ? 'orange' :
-            status === 'normal' ? 'sky' : 'blue';
+            status === 'critical' ? 'text-red-500' :
+            status === 'warning' ? 'text-orange-500' :
+            status === 'normal' ? 'text-sky-500' : 'text-blue-500';
 
           return (
             <KPICard

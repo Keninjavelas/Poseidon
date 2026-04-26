@@ -52,7 +52,7 @@ export function UsageTracker() {
           label="Harvested Utilization"
           value={utilizationPct.toFixed(1)}
           unit="%"
-          warning={utilizationPct < LOW_EFFICIENCY_THRESHOLD}
+          status={utilizationPct < LOW_EFFICIENCY_THRESHOLD ? 'warning' : 'normal'}
         />
       </div>
 

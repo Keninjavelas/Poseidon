@@ -55,9 +55,9 @@ export function QualityTracker() {
       <h2 className="text-xl font-semibold text-gray-800">Water Quality Tracker</h2>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <KPICard label="pH" value={ph.toFixed(2)} warning={ph < 6.5 || ph > 8.5} />
-        <KPICard label="TDS" value={tds.toFixed(0)} unit="ppm" warning={tds > 500} />
-        <KPICard label="Turbidity" value={turbidity.toFixed(1)} unit="NTU" warning={turbidity > 50} />
+        <KPICard label="pH" value={ph.toFixed(2)} status={ph < 6.5 || ph > 8.5 ? 'critical' : 'normal'} />
+        <KPICard label="TDS" value={tds.toFixed(0)} unit="ppm" status={tds > 500 ? 'warning' : 'normal'} />
+        <KPICard label="Turbidity" value={turbidity.toFixed(1)} unit="NTU" status={turbidity > 50 ? 'warning' : 'normal'} />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">

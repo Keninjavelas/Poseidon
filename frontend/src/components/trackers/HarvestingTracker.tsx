@@ -48,7 +48,7 @@ export function HarvestingTracker() {
             label={`${t.id} Volume`}
             value={t.volume.toFixed(0)}
             unit={`L (${(t.fillPct * 100).toFixed(1)}%)`}
-            warning={t.fillPct < LOW_RESERVE_THRESHOLD}
+            status={t.fillPct < LOW_RESERVE_THRESHOLD ? 'critical' : 'normal'}
           />
         ))}
         <KPICard label="Total Capacity" value={latestTanks.reduce((s, t) => s + t.capacity, 0).toFixed(0)} unit="L" />
