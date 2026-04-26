@@ -120,8 +120,17 @@ export const useStore = create<DigitalTwinState>((set) => ({
         return state;
       }
 
-      const channel = 'channel' in parsed.data ? parsed.data.channel : parsed.data.type;
-      const data = 'data' in parsed.data ? parsed.data.data : parsed.data.payload;
+      const msg = parsed.data;
+      let channel: string;
+      let data: any;
+
+      if ('channel' in msg) {
+        channel = msg.channel;
+        data = msg.data;
+      } else {
+        channel = msg.type;
+        data = msg.payload;
+      }
 
       switch (channel) {
         case 'alerts': {
