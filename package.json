@@ -9,6 +9,7 @@
     "dev:infra": "docker compose up -d timescaledb redis mosquitto && docker compose run --rm db-migrate",
     "dev:stack": "npm run dev:free-ports && npm run dev:infra && npx --yes concurrently --names \"simulate,ingest,process,api,frontend,edge\" --prefix-colors \"blue,green,cyan,magenta,yellow,red\" \"npm run dev:simulate --prefix backend\" \"npm run dev:ingest --prefix backend\" \"npm run dev:process --prefix backend\" \"npm run dev:api --prefix backend\" \"npm run dev:frontend\" \"python edge_ai/optical_sentry.py\"",
     "predev:stack": "node scripts/bootstrap-dev.js",
+    "build": "npm run build --prefix frontend",
     "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend && pip install -r edge_ai/requirements.txt"
   },
   "dependencies": {
