@@ -16,8 +16,8 @@ Poseidon is a distributed smart water platform with a backend-authoritative digi
 
 ```mermaid
 flowchart LR
-  Edge[Edge AI Node] -->|poseidon/alerts/#| MQTT[(Mosquitto)]
-  Sim[Telemetry Simulator] -->|poseidon/{module}/{sensor_id}| MQTT
+  Edge[Edge AI Node] -->|"poseidon/alerts/#"| MQTT[(Mosquitto)]
+  Sim[Telemetry Simulator] -->|"poseidon/{module}/{sensor_id}"| MQTT
 
   MQTT --> Ingest[Ingestion Service]
   Ingest -->|poseidon:raw| Redis[(Redis Pub/Sub)]
