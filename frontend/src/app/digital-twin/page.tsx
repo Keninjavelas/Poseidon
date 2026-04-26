@@ -15,6 +15,7 @@ type CameraMode = 'free' | 'top-down' | 'follow';
 export default function DigitalTwinPage() {
   const { subscribe } = useWebSocket();
 
+  const [isMounted, setIsMounted] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>('free');
   const [timelinePct, setTimelinePct] = useState(0);
 
@@ -30,8 +31,10 @@ export default function DigitalTwinPage() {
   const setTimeControl = useStore((state) => state.setTimeControl);
 
   useEffect(() => {
+    setIsMounted(true);
     let mounted = true;
 
+    // Initialize state from REST API on mount
     api
       .getTwinState()
       .then((response) => {
@@ -40,24 +43,15 @@ export default function DigitalTwinPage() {
         setTimeControl(response.control.paused, response.control.speed);
       })
       .catch(() => {
-        // Gracefully rely on websocket stream only.
+        // Gracefully rely on websocket stream only if REST fails
       });
-
-    const unsubscribeState = subscribe('system_state', (payload) => {
-      setSystemState(payload as typeof systemState);
-    });
-
-    const unsubscribeControl = subscribe('system_control', (payload) => {
-      const control = payload as { paused?: boolean; speed?: number };
-      setTimeControl(Boolean(control.paused), Number(control.speed ?? 1));
-    });
 
     return () => {
       mounted = false;
-      unsubscribeState();
-      unsubscribeControl();
     };
-  }, [setSystemState, setTimeControl, subscribe]);
+  }, [setSystemState, setTimeControl]);
+
+  const [showRaw, setShowRaw] = useState(false);
 
   const healthLabel = useMemo(() => {
     if (wsStatus !== 'connected') return 'degraded';
@@ -145,7 +139,7 @@ export default function DigitalTwinPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <MetricCard label="Avg Rainfall" value={`${avgRain.toFixed(2)} mm/hr`} />
               <MetricCard label="Temperature" value={`${systemState.temperatureC.toFixed(1)} C`} />
-              <MetricCard label="Simulation Time" value={timelineLabel} />
+              <MetricCard label="Simulation Time" value={isMounted ? timelineLabel : '--:--:--'} />
             </div>
           )}
         </section>
@@ -222,6 +216,36 @@ export default function DigitalTwinPage() {
               </div>
             </div>
           )}
+
+          <div className="rounded-lg border border-slate-200 p-3 flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              <div className="text-xs text-slate-500">System Debug Panel</div>
+              <button 
+                onClick={() => setShowRaw(!showRaw)}
+                className="text-[10px] text-sky-600 hover:underline"
+              >
+                {showRaw ? 'Show Simplified' : 'Show Full JSON'}
+              </button>
+            </div>
+            {isMounted && (
+              <div className="bg-slate-900 rounded p-2 text-[10px] font-mono text-emerald-400 overflow-auto max-h-[300px]">
+                <div className="mb-1 text-slate-400 border-b border-slate-700 pb-1 flex justify-between">
+                  <span>Last Update: {new Date(systemState.timestamp).toLocaleTimeString()}</span>
+                  <span>Speed: {timeControl.speed}x {timeControl.isPaused ? '(PAUSED)' : ''}</span>
+                </div>
+                <pre>
+                  {showRaw 
+                    ? JSON.stringify(systemState, null, 2)
+                    : JSON.stringify({
+                      rainfall: Object.values(systemState.rainfall).map(r => `${r.sensorId}: ${r.mmPerHour.toFixed(1)}`),
+                      tanks: Object.values(systemState.tanks).map(t => `${t.id}: ${t.volumeLiters.toFixed(0)}L (${((t.volumeLiters/t.capacityLiters)*100).toFixed(0)}%)`),
+                      soil: Object.values(systemState.soil).map(s => `${s.zoneId}: ${s.moisturePct.toFixed(1)}%`)
+                    }, null, 2)
+                  }
+                </pre>
+              </div>
+            )}
+          </div>
 
           <div className="rounded-lg border border-slate-200 p-3 flex flex-col gap-2">
             <div className="text-xs text-slate-500">Inject Events</div>

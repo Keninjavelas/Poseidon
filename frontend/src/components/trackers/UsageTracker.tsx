@@ -1,53 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { KPICard } from '@/components/layout/KPICard';
-import { StatusMessage } from '@/components/layout/StatusMessage';
-import { api } from '@/lib/api';
-import { useWebSocket } from '@/lib/useWebSocket';
-import type { UsageReading } from '@/types';
+import { useStore } from '@/store/useStore';
 
-const MAX_CHART_PERIODS = 24;
 const LOW_EFFICIENCY_THRESHOLD = 30;
 
 export function UsageTracker() {
-  const [readings, setReadings] = useState<UsageReading[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { subscribe } = useWebSocket();
+  const [isMounted, setIsMounted] = useState(false);
+  const systemState = useStore((state) => state.systemState);
 
   useEffect(() => {
-    api.getUsage(100)
-      .then((data) => { setReadings(data.slice(-MAX_CHART_PERIODS)); setLoading(false); })
-      .catch((e) => { setError(e.message); setLoading(false); });
+    setIsMounted(true);
   }, []);
 
-  useEffect(() => {
-    const unsubscribe = subscribe('usage', (data) => {
-      setReadings((prev) => [...prev, data as UsageReading].slice(-MAX_CHART_PERIODS));
-    });
-    return unsubscribe;
-  }, [subscribe]);
+  const usageStats = useMemo(() => {
+    const usageValues = Object.values(systemState.usage || {});
+    const totalHarvested = usageValues.reduce((sum, z) => sum + (z.harvestedLiters || 0), 0);
+    const totalMunicipal = usageValues.reduce((sum, z) => sum + (z.municipalLiters || 0), 0);
+    const utilizationPct = (totalHarvested / (totalHarvested + totalMunicipal || 1)) * 100;
 
-  if (loading) return <StatusMessage type="loading" />;
-  if (error) return <StatusMessage type="error" message={error} />;
+    return { total: totalHarvested + totalMunicipal, municipal: totalMunicipal, harvested: totalHarvested, utilizationPct };
+  }, [systemState.usage]);
 
-  const current = readings[readings.length - 1];
-  const total = current?.total_liters ?? 0;
-  const municipal = current?.municipal_liters ?? 0;
-  const harvested = current?.harvested_liters ?? 0;
-  const utilizationPct = total > 0 ? (harvested / total) * 100 : 0;
+  const chartData = useMemo(() => {
+    const usageValues = Object.values(systemState.usage || {});
+    return usageValues.map((z, i) => ({
+      zone: `Z${i + 1}`,
+      municipal: Number((z.municipalLiters || 0).toFixed(1)),
+      harvested: Number((z.harvestedLiters || 0).toFixed(1)),
+    }));
+  }, [systemState.usage]);
 
-  const chartData = readings.map((r) => ({
-    time: new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    municipal: Number(r.municipal_liters.toFixed(1)),
-    harvested: Number(r.harvested_liters.toFixed(1)),
-  }));
+  const { total, municipal, harvested, utilizationPct } = usageStats;
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-xl font-semibold text-gray-800">Water Usage Tracker</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-800">Water Usage Tracker</h2>
+        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-wider border border-emerald-200">
+          Live Twin State
+        </span>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <KPICard label="Total Consumption" value={total.toFixed(1)} unit="L" />
@@ -62,23 +57,38 @@ export function UsageTracker() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-        <h3 className="text-sm font-medium text-gray-500 mb-3">Municipal vs Harvested (last 24 periods)</h3>
+        <h3 className="text-sm font-medium text-gray-500 mb-3">Usage by Zone (Current)</h3>
         {chartData.length === 0 ? (
-          <StatusMessage type="empty" />
+          <div className="h-[280px] flex items-center justify-center text-slate-400 text-sm italic">
+            Waiting for digital twin data...
+          </div>
         ) : (
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="time" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+              <XAxis dataKey="zone" tick={{ fontSize: 10 }} />
               <YAxis unit=" L" tick={{ fontSize: 10 }} />
-              <Tooltip />
+              <Tooltip 
+                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+              />
               <Legend />
-              <Bar dataKey="municipal" stackId="a" fill="#f59e0b" name="Municipal (L)" />
-              <Bar dataKey="harvested" stackId="a" fill="#3b82f6" name="Harvested (L)" />
+              <Bar dataKey="municipal" stackId="a" fill="#f59e0b" name="Municipal (L)" isAnimationActive={false} />
+              <Bar dataKey="harvested" stackId="a" fill="#3b82f6" name="Harvested (L)" isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         )}
       </div>
+
+      {isMounted && (
+        <div className="bg-slate-900 rounded-lg p-4 mt-4 overflow-auto max-h-40">
+          <div className="text-xs text-emerald-400 font-mono mb-2 border-b border-slate-700 pb-1">
+            DEBUG: systemState
+          </div>
+          <pre className="text-[10px] text-emerald-500 font-mono">
+            {JSON.stringify(systemState, null, 2)}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }

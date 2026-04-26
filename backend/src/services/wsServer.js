@@ -54,6 +54,9 @@ function createWsServer(httpServer, WsServerClass = WebSocket.Server) {
    * @param {unknown} data - The payload to send
    */
   function broadcast(channel, data) {
+    if (channel === 'system_state') {
+      console.log(`[WS] Broadcasting system_state to ${clients.size} clients`);
+    }
     const message = JSON.stringify({ channel, data });
     for (const ws of clients) {
       if (ws.readyState === WebSocket.OPEN) {

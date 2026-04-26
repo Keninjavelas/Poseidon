@@ -60,10 +60,16 @@ type DigitalTwinState = {
 const MAX_ALERTS = 20;
 const MAX_SERIES = 64;
 
-const wsMessageSchema = z.object({
-  channel: z.enum(['rainfall', 'tanks', 'quality', 'irrigation', 'usage', 'alerts', 'system_state', 'system_control']),
-  data: z.unknown(),
-});
+const wsMessageSchema = z.union([
+  z.object({
+    channel: z.enum(['rainfall', 'tanks', 'quality', 'irrigation', 'usage', 'alerts', 'system_state', 'system_control']),
+    data: z.unknown(),
+  }),
+  z.object({
+    type: z.enum(['rainfall', 'tanks', 'quality', 'irrigation', 'usage', 'alerts', 'system_state', 'system_control']),
+    payload: z.unknown(),
+  }),
+]);
 
 export const useStore = create<DigitalTwinState>((set) => ({
   wsStatus: 'connecting',
@@ -114,9 +120,12 @@ export const useStore = create<DigitalTwinState>((set) => ({
         return state;
       }
 
-      switch (parsed.data.channel) {
+      const channel = 'channel' in parsed.data ? parsed.data.channel : parsed.data.type;
+      const data = 'data' in parsed.data ? parsed.data.data : parsed.data.payload;
+
+      switch (channel) {
         case 'alerts': {
-          const alert = parsed.data.data as AnomalyAlert;
+          const alert = data as AnomalyAlert;
           const nextAlerts = [alert, ...state.alerts].slice(0, MAX_ALERTS);
           const nextSystem = {
             ...state.systemState,
@@ -134,72 +143,101 @@ export const useStore = create<DigitalTwinState>((set) => ({
           return { alerts: nextAlerts, systemState: nextSystem };
         }
         case 'rainfall': {
-          const reading = parsed.data.data as LegacyRainfall;
-          const next = { ...state.systemState };
-          if (next.rainfall[reading.station_id]) {
-            next.rainfall[reading.station_id] = {
-              ...next.rainfall[reading.station_id],
-              mmPerHour: reading.precipitation_rate_mm_hr,
-              status: 'online',
-            };
-          }
+          const reading = data as LegacyRainfall;
+          if (!reading) return state;
+          
           return {
             rainfall: [...state.rainfall, reading].slice(-MAX_SERIES),
-            systemState: next,
           };
         }
         case 'tanks': {
-          const reading = parsed.data.data as TankReading;
-          const next = { ...state.systemState };
-          if (next.tanks[reading.tank_id]) {
-            next.tanks[reading.tank_id] = {
-              ...next.tanks[reading.tank_id],
-              volumeLiters: reading.volume_liters,
-              capacityLiters: reading.capacity_liters,
-            };
-          }
+          const reading = data as TankReading;
+          if (!reading) return state;
+
           return {
             harvesting: [...state.harvesting, reading].slice(-MAX_SERIES),
-            systemState: next,
           };
         }
         case 'quality':
-          return { quality: [...state.quality, parsed.data.data as QualityReading].slice(-MAX_SERIES) };
+          return { quality: [...state.quality, data as QualityReading].slice(-MAX_SERIES) };
         case 'irrigation': {
-          const reading = parsed.data.data as IrrigationReading;
-          const next = { ...state.systemState };
-          if (next.soil[reading.zone_id]) {
-            next.soil[reading.zone_id] = {
-              ...next.soil[reading.zone_id],
-              moisturePct: reading.soil_moisture_percent,
-              irrigationUsageLps: reading.irrigation_demand_liters / 3600,
-            };
-          }
+          const reading = data as IrrigationReading;
+          if (!reading) return state;
+
           return {
             agriculture: [...state.agriculture, reading].slice(-MAX_SERIES),
-            systemState: next,
           };
         }
         case 'usage': {
-          const reading = parsed.data.data as UsageReading;
-          const next = { ...state.systemState };
-          Object.values(next.usage).forEach((zoneUsage) => {
-            zoneUsage.harvestedLiters = reading.harvested_liters;
-            zoneUsage.municipalLiters = reading.municipal_liters;
-            zoneUsage.totalLiters = reading.total_liters;
-          });
+          const reading = data as UsageReading;
+          if (!reading) return state;
+
           return {
             usage: [...state.usage, reading].slice(-MAX_SERIES),
-            systemState: next,
           };
         }
         case 'system_state': {
+          const incomingData = data as any;
+          
+          if (!incomingData || typeof incomingData !== 'object') {
+            console.error('[STORE] Received invalid system_state:', data);
+            return state;
+          }
+
+          // USE ONLY system_state as requested
+          const nextState: SystemState = {
+            ...INITIAL_SYSTEM_STATE,
+            ...incomingData,
+          };
+
+          const isoTimestamp = typeof nextState.timestamp === 'number' 
+            ? new Date(nextState.timestamp).toISOString() 
+            : (nextState.timestamp || new Date().toISOString());
+          
+          // Explode state into historical arrays for dashboards
+          const newRainfall = Object.values(nextState.rainfall || {}).map(r => ({
+            id: Math.random(),
+            timestamp: isoTimestamp,
+            station_id: r.sensorId,
+            precipitation_rate_mm_hr: r.mmPerHour || 0,
+          } as LegacyRainfall));
+
+          const newHarvesting = Object.values(nextState.tanks || {}).map(t => ({
+            id: Math.random(),
+            timestamp: isoTimestamp,
+            tank_id: t.id,
+            volume_liters: t.volume_liters || t.volumeLiters || 0,
+            capacity_liters: t.capacity_liters || t.capacityLiters || 1,
+          } as TankReading));
+
+          const newAgriculture = Object.values(nextState.soil || {}).map(s => ({
+            id: Math.random(),
+            timestamp: isoTimestamp,
+            zone_id: s.zoneId,
+            soil_moisture_percent: s.moisturePct || 0,
+            irrigation_demand_liters: (s.irrigationUsageLps || 0) * 3600,
+            water_source: (s.moisturePct || 0) < 50 ? 'municipal' : 'harvested',
+          } as IrrigationReading));
+
+          const newUsage = Object.entries(nextState.usage || {}).map(([zoneId, u]) => ({
+            id: Math.random(),
+            timestamp: isoTimestamp,
+            zone_id: zoneId,
+            municipal_liters: u.municipalLiters || 0,
+            harvested_liters: u.harvestedLiters || 0,
+            total_liters: u.totalLiters || 0,
+          } as UsageReading));
+
           return {
-            systemState: parsed.data.data as SystemState,
+            systemState: nextState,
+            rainfall: [...state.rainfall, ...newRainfall].slice(-MAX_SERIES),
+            harvesting: [...state.harvesting, ...newHarvesting].slice(-MAX_SERIES),
+            agriculture: [...state.agriculture, ...newAgriculture].slice(-MAX_SERIES),
+            usage: [...state.usage, ...newUsage].slice(-MAX_SERIES),
           };
         }
         case 'system_control': {
-          const payload = parsed.data.data as { paused?: boolean; speed?: number };
+          const payload = data as { paused?: boolean; speed?: number };
           return {
             timeControl: {
               ...state.timeControl,

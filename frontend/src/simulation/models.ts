@@ -90,7 +90,7 @@ export const DEFAULT_SIMULATION_CONFIG: SimulationConfig = {
 };
 
 export const INITIAL_SYSTEM_STATE: SystemState = {
-  timestamp: Date.now(),
+  timestamp: 1714125600000, // Fixed constant timestamp to prevent SSR hydration mismatch
   temperatureC: 27,
   rainfall: {
     S1: { sensorId: 'S1', mmPerHour: 2.8, status: 'online' },

@@ -4,11 +4,18 @@ import { memo, useCallback, useMemo } from 'react';
 import { ensureLeafletSetup } from '@/lib/leafletSetup';
 import { useWebSocket } from '@/lib/useWebSocket';
 import { useStore } from '@/store/useStore';
-import { GEO_ENTITIES } from '@/simulation/models';
-import { CircleMarker, MapContainer, Popup, TileLayer, Tooltip } from 'react-leaflet';
+import { GEO_ENTITIES, ZONE_GEOMETRIES } from '@/simulation/models';
+import { CircleMarker, MapContainer, Polygon, Popup, TileLayer, Tooltip } from 'react-leaflet';
 
 type Status = 'normal' | 'warning' | 'critical';
 type LatLng = [number, number];
+
+function getMoistureColor(percent: number): string {
+  if (percent < 25) return '#dc2626'; // Red (Critical)
+  if (percent < 40) return '#f97316'; // Orange (Low)
+  if (percent < 70) return '#38bdf8'; // Sky Blue (Normal)
+  return '#1d4ed8'; // Blue (Optimal)
+}
 
 type MarkerBase = {
   id: string;
@@ -36,23 +43,24 @@ const DEFAULT_CENTER: LatLng = [19.076, 72.8777];
 function statusColor(status: Status): string {
   switch (status) {
     case 'critical':
-      return '#dc2626';
+      return '#dc2626'; // Red
     case 'warning':
-      return '#f59e0b';
+      return '#f97316'; // Orange
     default:
-      return '#16a34a';
+      return '#38bdf8'; // Sky Blue (Healthy/Normal)
   }
 }
 
 function tankStatus(fillPct: number, failure: boolean): Status {
-  if (failure || fillPct < 0.15) return 'critical';
+  if (failure || fillPct < 0.25) return 'critical';
   if (fillPct < 0.4) return 'warning';
   return 'normal';
 }
 
 function sensorStatus(online: boolean, rainfallMmHr: number): Status {
   if (!online) return 'critical';
-  if (rainfallMmHr >= 30) return 'warning';
+  if (rainfallMmHr >= 50) return 'critical';
+  if (rainfallMmHr >= 20) return 'warning';
   return 'normal';
 }
 
@@ -166,6 +174,22 @@ export function LeafletMap() {
         const tank = systemState.tanks[entity.id];
         const fillPct = tank ? tank.volumeLiters / Math.max(tank.capacityLiters, 1) : 0;
         const status = tankStatus(fillPct, tank?.failure ?? false);
+
+        // Find nearest sensor for localized rainfall
+        let nearestRainfall = 0;
+        let minDistance = Infinity;
+
+        GEO_ENTITIES.filter((e) => e.type === 'sensor').forEach((sensor) => {
+          const dist = Math.sqrt(
+            Math.pow(entity.coordinates[0] - sensor.coordinates[0], 2) +
+              Math.pow(entity.coordinates[1] - sensor.coordinates[1], 2),
+          );
+          if (dist < minDistance) {
+            minDistance = dist;
+            nearestRainfall = systemState.rainfall[sensor.id]?.mmPerHour ?? 0;
+          }
+        });
+
         return {
           id: entity.id,
           name: tank?.name ?? entity.id,
@@ -174,12 +198,12 @@ export function LeafletMap() {
           status,
           selected: selectedEntity?.id === entity.id,
           fillPct,
-          rainfallMmHr: avgRainfall,
+          rainfallMmHr: nearestRainfall,
           volumeLiters: tank?.volumeLiters ?? 0,
           capacityLiters: tank?.capacityLiters ?? 1,
         };
       }),
-    [avgRainfall, selectedEntity?.id, systemState.tanks],
+    [selectedEntity?.id, systemState.rainfall, systemState.tanks],
   );
 
   const sensors = useMemo(
@@ -203,6 +227,23 @@ export function LeafletMap() {
     [selectedEntity?.id, systemState.rainfall],
   );
 
+  const zones = useMemo(
+    () =>
+      ZONE_GEOMETRIES.map((geo) => {
+        const soil = systemState.soil[geo.id];
+        const moisture = soil?.moisturePct ?? 50;
+        const color = getMoistureColor(moisture);
+        return {
+          id: geo.id,
+          positions: geo.coordinates.map((c) => [c[1], c[0]] as LatLng),
+          moisture,
+          color,
+          selected: selectedEntity?.id === geo.id,
+        };
+      }),
+    [selectedEntity?.id, systemState.soil],
+  );
+
   return (
     <div className="relative h-[60vh] overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-slate-50">
       <MapContainer center={DEFAULT_CENTER} zoom={13} scrollWheelZoom className="h-full w-full">
@@ -210,6 +251,23 @@ export function LeafletMap() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
+
+        {zones.map((zone) => (
+          <Polygon
+            key={zone.id}
+            positions={zone.positions}
+            pathOptions={{
+              fillColor: zone.color,
+              fillOpacity: 0.65, // Increased opacity for better visibility
+              color: zone.selected ? '#ffffff' : zone.color,
+              weight: zone.selected ? 3 : 1,
+            }}
+          >
+            <Tooltip sticky>
+              Zone {zone.id}: {zone.moisture.toFixed(1)}% Moisture
+            </Tooltip>
+          </Polygon>
+        ))}
 
         {tanks.map((tank) => (
           <TankMarker key={tank.id} {...tank} />

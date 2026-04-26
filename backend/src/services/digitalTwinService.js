@@ -184,66 +184,110 @@ function createDigitalTwinService(redisBus, logger, options = {}) {
 
     processEvents(nextState);
 
-    const rainBase =
-      config.baseRainMmHr +
-      config.rainAmplitudeMmHr * Math.sin(2 * Math.PI * config.rainFrequencyHz * t);
+    // FIX RAINFALL: simplified sin wave + clamping
+    const time = Date.now() / 1000;
+    const rainBase = 20 + 15 * Math.sin(time / 5) + (Math.random() - 0.5) * 5;
 
     Object.values(nextState.rainfall).forEach((sensor) => {
       if (sensor.status === 'offline') {
         sensor.mmPerHour = 0;
         return;
       }
-      const noise = (rng.next() - 0.5) * 0.4;
-      sensor.mmPerHour = clamp(rainBase + rainSpike + noise, 0, 60);
+      sensor.mmPerHour = clamp(rainBase, 5, 35);
     });
 
-    const rainfallReadings = Object.values(nextState.rainfall);
-    const avgRainMmHr =
-      rainfallReadings.reduce((acc, reading) => acc + reading.mmPerHour, 0) / Math.max(rainfallReadings.length, 1);
-    const rainMetersPerSecond = avgRainMmHr / 1000 / 3600;
+    const getNearestRainfall = (id) => {
+      if (id === 'T1' || id === 'Z1') return nextState.rainfall.S1.mmPerHour;
+      if (id === 'T2' || id === 'Z2') return nextState.rainfall.S2.mmPerHour;
+      return nextState.rainfall.S3.mmPerHour;
+    };
 
     Object.values(nextState.tanks).forEach((tank) => {
-      const inflowLps = tank.failure ? 0 : rainMetersPerSecond * tank.catchmentAreaM2 * tank.efficiency * 1000;
-      const outflowLps = tank.irrigationOutflowLps + tank.usageOutflowLps;
-      tank.volumeLiters = clamp(tank.volumeLiters + (inflowLps - outflowLps) * dtSeconds, 0, tank.capacityLiters);
-      if (tank.volumeLiters <= 0.01 * tank.capacityLiters) {
-        enqueueAlert({
-          id: `alert-${nextState.timestamp}-tank-${tank.id}`,
-          timestamp: nextState.timestamp,
-          severity: 'warning',
-          sourceId: tank.id,
-          message: `Tank ${tank.name} critically low`,
-        });
-      }
+      const localRain = getNearestRainfall(tank.id);
+      const inflow = localRain * 0.5 * dtSeconds * 100;
+      tank.volumeLiters = clamp(tank.volumeLiters + inflow, 0, tank.capacityLiters);
     });
 
-    const evaporation = calculateEvaporation(nextState.temperatureC, dtSeconds);
-    Object.values(nextState.soil).forEach((soil) => {
-      const rainfallGain = avgRainMmHr * soil.absorptionRate * dtSeconds * 0.01;
-      const irrigationLoss = soil.irrigationUsageLps * dtSeconds * 0.01;
-      soil.moisturePct = clamp(soil.moisturePct + rainfallGain - evaporation - irrigationLoss, 0, 100);
+    const evaporation = 2;
+    Object.values(nextState.soil).forEach((soil, idx) => {
+      const localRain = getNearestRainfall(soil.zoneId);
+      const rainfallGain = localRain * 0.2 * dtSeconds;
+      const evaporationLoss = evaporation * dtSeconds;
+      const irrigationLoss = soil.irrigationUsageLps * 0.1 * dtSeconds;
+      const variation = Math.sin(t + idx) * 5 * dtSeconds;
 
+      soil.moisturePct = clamp(soil.moisturePct + rainfallGain - evaporationLoss - irrigationLoss + variation, 0, 100);
+
+      // FIX TANK + USAGE LOGIC (Harvested first)
       const usage = nextState.usage[soil.zoneId];
       if (usage) {
-        const harvestedLiters = clamp(soil.moisturePct * 20, 0, 3200);
-        const municipalLiters = clamp(3600 - harvestedLiters, 0, 3600);
-        usage.harvestedLiters = harvestedLiters;
-        usage.municipalLiters = municipalLiters;
-        usage.totalLiters = harvestedLiters + municipalLiters;
+        const totalNeeded = (3600 * dtSeconds) * (1 + (rng.next() - 0.5) * 0.4); 
+        let remainingDemand = totalNeeded;
+        let harvestedUsed = 0;
+
+        const tankId = soil.zoneId === 'Z1' ? 'T1' : 'T2';
+        const tank = nextState.tanks[tankId];
+
+        if (tank && tank.volumeLiters > 0 && !tank.failure) {
+          harvestedUsed = Math.min(tank.volumeLiters, remainingDemand);
+          tank.volumeLiters -= harvestedUsed;
+          remainingDemand -= harvestedUsed;
+        }
+
+        const municipalUsed = remainingDemand;
+
+        // FIX STATE PERSISTENCE (VERY IMPORTANT)
+        nextState.tanks[tankId] = { ...tank };
+        nextState.soil[soil.zoneId] = { ...soil };
+        nextState.usage[soil.zoneId] = {
+          zoneId: soil.zoneId,
+          harvestedLiters: harvestedUsed,
+          municipalLiters: municipalUsed,
+          totalLiters: totalNeeded
+        };
+
+        // ADD DEBUG LOGS
+        console.log({
+          zone: soil.zoneId,
+          rainfall: localRain.toFixed(2),
+          tankVolume: tank.volumeLiters.toFixed(2),
+          harvestedUsed: harvestedUsed.toFixed(2),
+          municipalUsed: municipalUsed.toFixed(2)
+        });
       }
 
-      if (soil.moisturePct < 20) {
+      if (soil.moisturePct < 30) {
         enqueueAlert({
           id: `alert-${nextState.timestamp}-soil-${soil.zoneId}`,
           timestamp: nextState.timestamp,
           severity: 'critical',
           sourceId: soil.zoneId,
-          message: `Zone ${soil.zoneId} moisture critically low`,
+          message: `Zone ${soil.zoneId} moisture low: ${soil.moisturePct.toFixed(1)}%`,
         });
       }
     });
 
-    rainSpike *= 0.9;
+    // Alert for low tank levels (after usage processing)
+    Object.values(nextState.tanks).forEach((tank) => {
+      if (tank.volumeLiters <= 0.1 * tank.capacityLiters) {
+        enqueueAlert({
+          id: `alert-${nextState.timestamp}-tank-${tank.id}`,
+          timestamp: nextState.timestamp,
+          severity: 'warning',
+          sourceId: tank.id,
+          message: `Tank ${tank.name} level critical: ${(tank.volumeLiters).toFixed(0)}L`,
+        });
+      }
+    });
+
+    const rainReadings = Object.values(nextState.rainfall);
+    const avgRainMmHr = rainReadings.length > 0 
+      ? rainReadings.reduce((sum, s) => sum + s.mmPerHour, 0) / rainReadings.length 
+      : 0;
+
+    console.log(`[TWIN] t=${new Date(nextState.timestamp).toISOString()} avgRain=${avgRainMmHr.toFixed(2)}mm/hr tank1=${nextState.tanks.T1.volumeLiters.toFixed(0)}L moistureZ1=${nextState.soil.Z1.moisturePct.toFixed(1)}%`);
+
+    rainSpike *= 0.95; // Slower decay
     state = nextState;
     return state;
   }

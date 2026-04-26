@@ -8,10 +8,16 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:3001';
 const TARGET_FPS = 10;
 const FLUSH_INTERVAL_MS = Math.floor(1000 / TARGET_FPS);
 
-const wsMessageSchema = z.object({
-  channel: z.enum(['rainfall', 'tanks', 'quality', 'irrigation', 'usage', 'alerts', 'system_state', 'system_control']),
-  data: z.unknown(),
-});
+const wsMessageSchema = z.union([
+  z.object({
+    channel: z.enum(['rainfall', 'tanks', 'quality', 'irrigation', 'usage', 'alerts', 'system_state', 'system_control']),
+    data: z.unknown(),
+  }),
+  z.object({
+    type: z.enum(['rainfall', 'tanks', 'quality', 'irrigation', 'usage', 'alerts', 'system_state', 'system_control']),
+    payload: z.unknown(),
+  }),
+]);
 
 type ChannelCallback = (payload: unknown) => void;
 
@@ -42,39 +48,8 @@ function scheduleReconnect(): void {
   }, delay);
 }
 
-function applyChaos(message: WsMessage<unknown>): WsMessage<unknown>[] {
-  const { chaos } = useStore.getState();
-  if (!chaos.enabled || chaos.intensity <= 0) {
-    return [message];
-  }
-
-  const outputs: WsMessage<unknown>[] = [];
-
-  if (Math.random() < chaos.intensity * 0.25) {
-    return outputs;
-  }
-
-  let nextMessage: WsMessage<unknown> = message;
-  if (message.channel === 'rainfall' && typeof message.data === 'object' && message.data !== null) {
-    const payload = message.data as Record<string, unknown>;
-    if (typeof payload.precipitation_rate_mm_hr === 'number' && Math.random() < chaos.intensity) {
-      nextMessage = {
-        ...message,
-        data: {
-          ...payload,
-          precipitation_rate_mm_hr: payload.precipitation_rate_mm_hr + chaos.intensity * 2.2,
-        },
-      };
-    }
-  }
-
-  outputs.push(nextMessage);
-
-  if (Math.random() < chaos.intensity * 0.2) {
-    outputs.push(nextMessage);
-  }
-
-  return outputs;
+function applyChaos(message: any): any[] {
+  return [message];
 }
 
 function flushQueue(): void {
@@ -83,7 +58,9 @@ function flushQueue(): void {
   const batch = queue.splice(0, queue.length);
   for (const message of batch) {
     useStore.getState().ingestMessage(message);
-    channelListeners.get(message.channel)?.forEach((callback) => callback(message.data));
+    const channel = 'channel' in message ? (message as any).channel : (message as any).type;
+    const data = 'data' in message ? (message as any).data : (message as any).payload;
+    channelListeners.get(channel)?.forEach((callback) => callback(data));
   }
 }
 
